@@ -12,7 +12,7 @@ import org.apache.kafka.common.TopicPartition
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import scala.concurrent.ExecutionContext.Implicits.global
-import org.codehaus.jackson.map.deser.std.StringDeserializer
+import org.apache.kafka.common.serialization.StringSerializer
 import org.slf4j.LoggerFactory
 import reflect.ClassTag
 import scala.collection.JavaConverters._
