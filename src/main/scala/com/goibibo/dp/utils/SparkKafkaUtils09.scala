@@ -175,24 +175,3 @@ object SparkKafkaUtils09 {
     }.getOrElse(false)
   }
 }
-
-/*
-
-//testing code
-
-import com.goibibo.dp.utils.{SparkKafkaUtils,ZkUtils,KfUtils}
-
-implicit val zk = ZkUtils.connect("127.0.0.1:2181/apps/hotel_etl").get
-
-val broker = "127.0.0.1"
-val topics = Seq("test_hotel_etl", "test_flight_etl")
-val consumerGroup = "testetl1"
-
-val (rddKafka, offsetsToCommit) = SparkKafkaUtils.createRdd(broker, topics, consumerGroup, sc)
-rddKafka.collect
-KfUtils.commitOffsets(consumerGroup, offsetsToCommit)
-
-*/
-
-
-
