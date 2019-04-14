@@ -1,7 +1,9 @@
 name := "dataplatform_utils"
 organization := "com.goibibo"
 version := "2.4"
-scalaVersion := "2.11.8"
+scalaVersion := "2.11.12"
+javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
+scalacOptions += "-target:jvm-1.8"
 
 libraryDependencies ++= Seq(
     "org.apache.spark" %% "spark-core" % "2.4.0" % "provided",
@@ -15,5 +17,7 @@ libraryDependencies ++= Seq(
     "org.apache.spark" %% "spark-streaming-kafka-0-10" % "2.4.0" % "provided",
     "com.jsuereth" %% "scala-arm" % "2.0",
     ("org.joda" % "joda-convert" % "2.1.2").
-        exclude("com.google.guava","guava")
+        exclude("com.google.guava","guava"),
+    "software.amazon.awssdk" % "glue" % "2.5.25",
+    "org.scalatest" %% "scalatest" % "3.0.7" % Test
 )
