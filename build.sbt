@@ -5,6 +5,8 @@ scalaVersion := "2.11.12"
 javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 scalacOptions += "-target:jvm-1.8"
 
+resolvers += "redshift" at "http://redshift-maven-repository.s3-website-us-east-1.amazonaws.com/release"
+
 libraryDependencies ++= Seq(
     "org.apache.spark" %% "spark-core" % "2.4.0" % "provided",
     "org.apache.spark" %% "spark-sql" % "2.4.0" % "provided",
@@ -18,6 +20,12 @@ libraryDependencies ++= Seq(
     "com.jsuereth" %% "scala-arm" % "2.0",
     ("org.joda" % "joda-convert" % "2.1.2").
         exclude("com.google.guava","guava"),
-    "software.amazon.awssdk" % "glue" % "2.5.25",
-    "org.scalatest" %% "scalatest" % "3.0.7" % Test
+    "com.amazon.redshift" % "redshift-jdbc4" % "1.2.20.1043",
+    "software.amazon.awssdk" % "glue" % "2.5.29",
+    "software.amazon.awssdk" % "redshift" % "2.5.29",
+    "org.scalatest" %% "scalatest" % "3.0.7" % "test",
+    "org.apache.hadoop" % "hadoop-aws" % "2.9.2" % "test",
+    "com.github.mjakubowski84" %% "parquet4s-core" % "0.4.0" % "test",
+    "com.github.pureconfig" %% "pureconfig" % "0.10.2" % "test",
+    "com.jsuereth" %% "scala-arm" % "2.0"
 )

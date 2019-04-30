@@ -42,6 +42,7 @@ import software.amazon.awssdk.regions.Region
 
 import scala.util.Try
 import scala.reflect.ClassTag
+import software.amazon.awssdk.services.glue.model.SerDeInfo
 
 import java.util.Date
 import java.sql.Timestamp
@@ -103,18 +104,21 @@ object GlueUtils {
       //add partition here
     }
   }
+
   def dropPartition() (implicit glueClient:GlueClient):Try[Unit] = {
     Try{
       //Implementation here
     }
   }
+
   def checkIfPartitionExists() (implicit glueClient:GlueClient):Try[Unit] = {
     Try{
       //Implementation here
     }
   }
+
   def getPartition(FieldInfos:Fields):(S3FilesList, PartitionDetails) = {
-    ( Seq[String](), new KeyPrefixPartition("") )
+    ( Seq[String](), KeyPrefixPartition("") )
   }
   
   def createTable(
@@ -124,22 +128,7 @@ object GlueUtils {
   (implicit glueClient:GlueClient):Try[Unit] = {
     
     Try{
-      import software.amazon.awssdk.services.glue.model.SerDeInfo
-      
-      val tableStorage:StorageDescriptor = StorageDescriptor.builder()
-      .location(location)
-      .columns(fieldInfoToGlueType(fields):_*)
-      .inputFormat(fileFormat.inputFormat)
-      .outputFormat(fileFormat.outputFormat)
-      .numberOfBuckets(fileFormat.numberOfBuckets)
-      .serdeInfo(
-        SerDeInfo.builder()
-          .serializationLibrary(fileFormat.serializationLibrary)
-          .parameters(Map[String,String]("serialization.format" -> fileFormat.serializationFormat).asJava)
-          .build()
-      )
-      .build()
-      
+      val tableStorage = createStorageDescriptor(location, fields, fileFormat)
       val tableInput:TableInput = TableInput.builder()
       .name(tableDetails.name)
       .tableType(TABLE_TYPE_EXTERNAL)
@@ -154,6 +143,23 @@ object GlueUtils {
       glueClient.createTable(createTableRequest)
     }
   }
+
+  def createStorageDescriptor(location:String, fields: Fields, fileFormat: GlueFileFormat):StorageDescriptor = {
+    StorageDescriptor.builder()
+      .location(location)
+      .columns(fieldInfoToGlueType(fields):_*)
+      .inputFormat(fileFormat.inputFormat)
+      .outputFormat(fileFormat.outputFormat)
+      .numberOfBuckets(fileFormat.numberOfBuckets)
+      .serdeInfo(
+        SerDeInfo.builder()
+          .serializationLibrary(fileFormat.serializationLibrary)
+          .parameters(Map[String,String]("serialization.format" -> fileFormat.serializationFormat).asJava)
+          .build()
+      )
+      .build()
+  }
+
   def dropTable() (implicit glueClient:GlueClient):Try[Unit] = {
     Try{
       //Implementation here
