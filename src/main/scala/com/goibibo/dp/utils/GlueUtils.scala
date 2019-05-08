@@ -42,20 +42,9 @@ import software.amazon.awssdk.regions.Region
 
 import scala.util.Try
 import scala.reflect.ClassTag
-import software.amazon.awssdk.services.glue.model.SerDeInfo
-
+import software.amazon.awssdk.services.glue.model.{CreateTableRequest, DeletePartitionRequest, DeleteTableRequest, EntityNotFoundException, GetTableRequest, SerDeInfo, StorageDescriptor, TableInput, Column => GlueColumn}
 import java.util.Date
-import java.sql.Timestamp
 
-import software.amazon.awssdk.services.glue.model.{Column => GlueColumn}
-import software.amazon.awssdk.services.glue.model.{
-  CreatePartitionRequest,
-  DeletePartitionRequest,
-  CreateTableRequest,
-  DeleteTableRequest,
-  TableInput,
-  StorageDescriptor
-}
 import collection.JavaConverters._
 
 
@@ -125,9 +114,8 @@ object GlueUtils {
     tableDetails:TableDetails, partitionKeys: Fields, 
     fields:Fields, location:String, fileFormat: GlueFileFormat
   ) 
-  (implicit glueClient:GlueClient):Try[Unit] = {
-    
-    Try{
+  (implicit glueClient:GlueClient):Try[Unit] = Try{
+
       val tableStorage = createStorageDescriptor(location, fields, fileFormat)
       val tableInput:TableInput = TableInput.builder()
       .name(tableDetails.name)
@@ -140,9 +128,10 @@ object GlueUtils {
       .databaseName(tableDetails.db)
       .tableInput(tableInput)
       .build()
+
       glueClient.createTable(createTableRequest)
+
     }
-  }
 
   def createStorageDescriptor(location:String, fields: Fields, fileFormat: GlueFileFormat):StorageDescriptor = {
     StorageDescriptor.builder()
@@ -160,11 +149,18 @@ object GlueUtils {
       .build()
   }
 
-  def dropTable() (implicit glueClient:GlueClient):Try[Unit] = {
-    Try{
-      //Implementation here
+  def isTableExists(tableDetails:TableDetails) (implicit glueClient:GlueClient):Try[Boolean] = {
+    val req = GetTableRequest.builder().databaseName(tableDetails.db).name(tableDetails.name).build()
+    Try { glueClient.getTable(req) }.map(_.table().name() == tableDetails.name).recover{
+      case _:EntityNotFoundException => false
     }
   }
+
+  def dropTable(tableDetails:TableDetails) (implicit glueClient:GlueClient):Try[Unit] = Try{
+    val deleteTableRequest: DeleteTableRequest = DeleteTableRequest.builder().databaseName(tableDetails.db).name(tableDetails.name).build()
+    glueClient.deleteTable(deleteTableRequest)
+  }
+
   def alterTableAddField() (implicit glueClient:GlueClient):Try[Unit] = {
     Try{
       //Implementation here
@@ -188,7 +184,6 @@ object GlueUtilsPrivate {
   def glueType[T:ClassTag]():String = {
     
     val runtimeClassOfT = implicitly[ClassTag[T]].runtimeClass
-    import org.apache.kafka.common.utils.Java
     if( runtimeClassOfT == classOf[String])     "STRING"
     else if( runtimeClassOfT == classOf[Int])   "INT"
     else if( runtimeClassOfT == classOf[Long] ) "LONG"

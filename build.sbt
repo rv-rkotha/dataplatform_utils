@@ -20,12 +20,15 @@ libraryDependencies ++= Seq(
     "com.jsuereth" %% "scala-arm" % "2.0",
     ("org.joda" % "joda-convert" % "2.1.2").
         exclude("com.google.guava","guava"),
+    ("org.apache.hadoop" % "hadoop-aws" % "2.9.2" ).
+      excludeAll( ExclusionRule(organization = "com.amazonaws")),
+    "com.amazonaws" % "aws-java-sdk-s3" % "1.11.199" ,
+    "com.github.mjakubowski84" %% "parquet4s-core" % "0.4.0",
     "com.amazon.redshift" % "redshift-jdbc4" % "1.2.20.1043",
     "software.amazon.awssdk" % "glue" % "2.5.29",
-    "software.amazon.awssdk" % "redshift" % "2.5.29",
-    "org.scalatest" %% "scalatest" % "3.0.7" % "test",
-    "org.apache.hadoop" % "hadoop-aws" % "2.9.2" % "test",
-    "com.github.mjakubowski84" %% "parquet4s-core" % "0.4.0" % "test",
-    "com.github.pureconfig" %% "pureconfig" % "0.10.2" % "test",
+    "software.amazon.awssdk" % "redshift" % "2.5.37",
+    "org.scalatest" %% "scalatest" % "3.0.7" ,
+    "com.github.pureconfig" %% "pureconfig" % "0.10.2",
     "com.jsuereth" %% "scala-arm" % "2.0"
+
 )

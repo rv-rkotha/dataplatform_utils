@@ -1,11 +1,23 @@
 package com.goibibo.dp.utils
 import GlueUtilsTypes._
 import org.scalatest._
-
 import com.github.mjakubowski84.parquet4s.{ParquetReader, ParquetWriter}
-
+import org.slf4j.Logger
+import pureconfig.loadConfigOrThrow
+import resource.managed
+import org.slf4j.{Logger, LoggerFactory}
+import java.util.{Calendar,TimeZone}
 
 class GlueUtilsTest extends FlatSpec with Matchers {
+
+  import pureconfig.generic.auto._
+  final case class RedshiftConf(  clusterId:String,user:String, dbGroup:String, autoCreate:String, region:String)
+  val redshiftConf = loadConfigOrThrow[RedshiftConf]("redshift")
+  import redshiftConf._
+  implicit val redshiftClient = RedshiftUtil.getClusterClient(region)
+  val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+
+  private val logger: Logger = LoggerFactory.getLogger(this.getClass)
 
   "GlueType" should "return valid types for premitive types" in {
     GlueUtilsPrivate.glueType[String]() should be ("STRING")
@@ -25,10 +37,8 @@ class GlueUtilsTest extends FlatSpec with Matchers {
     client.close
   }
 
-  "creation of Table" should "be successful" in {
+  "creation and drop of the Table" should "be successful" in {
     implicit val client = GlueUtils.createGlueClient()
-    // tableDetails:TableDetails, partitionKeys: Fields,
-    //  fields:Fields, location:String, fileFormat: GlueFileFormat
     val tableDetails  = TableDetails("testsunny","goibibo_e")
 //    val partitionKeys = Seq(FieldInfo("year","Int"))
     val partitionKeys = Seq[FieldInfo]()
@@ -37,26 +47,67 @@ class GlueUtilsTest extends FlatSpec with Matchers {
                           FieldInfo("name","string"),
                           FieldInfo("created","timestamp")
                         )
-    val location      = "s3://tmp-data-platform/test-sunny/"
 
+    val location      = "s3://tmp-data-platform/test-sunny/"
+    val path = location.replace("s3","s3a") + "test.parquet"
+    S3Utils.deleteS3Data(path)
+    val users = getDummyUsersData
+    writeData(path, users)
+
+    GlueUtils.dropTable(tableDetails)
     GlueUtils.createTable(tableDetails,partitionKeys, fields, location,ParquetFormat).get
+
+    assert(GlueUtils.isTableExists(tableDetails).get == true)
+
+    var usersR = Seq[User]()
+    for(
+      connection <- managed(RedshiftUtil.getConnection(clusterId,user).get);
+      rs <- RedshiftUtil.executeQuery(connection, s"select id, name, created from ${tableDetails.db}.${tableDetails.name}")
+    ) {
+      while(rs.next()) {
+        val id = rs.getString("id")
+        val name = rs.getString("name")
+        //If we don't specify UTC-Calendar then JDBC adjusts the epoch with default timezone, Crazy stuff.
+        //https://stackoverflow.com/a/34172897/148869
+        val created = rs.getTimestamp("created",utcCal)
+        usersR +:= User(id, name, created)
+      }
+    }
+    assert(usersR.toList.size == 2)
+    assert(usersR.toList.sortBy(_.id).map(_.created.getTime) == users.toList.sortBy(_.id).map(_.created.getTime))
+
+    GlueUtils.dropTable(tableDetails)
+    assert(GlueUtils.isTableExists(tableDetails).get == false)
+    S3Utils.deleteS3Data(path)
     client.close
   }
 
   "Read and Write to/From S3 of parquet file" should "successful" in {
-    case class User(id: String, name: String, created: java.sql.Timestamp)
 
-    val temp: Stream[User] = Stream(
-      User("1","Sunny",new java.sql.Timestamp(System.currentTimeMillis)),
-      User("2","Anurag",new java.sql.Timestamp(System.currentTimeMillis))
-    )
-    val users: Stream[User] = Stream[User]()
-    (1 to 10000).foreach( (i) =>
-      users ++: temp
-    )
+
+    val users: Stream[User] = getDummyUsersData
+
     val path = "s3a://tmp-data-platform/test-sunny/kjsdf.parquet"
-    ParquetWriter.write(path, users)
-//    ParquetReader.read[User](path).foreach(println)
+    S3Utils.deleteS3Data(path)
+    writeData(path,users)
+    val usersR = ParquetReader.read[User](path)
+    assert(usersR.toSeq.sortBy(_.id) == users.sortBy(_.id))
+    S3Utils.deleteS3Data(path)
+  }
+
+  case class User(id: String, name: String, created: java.sql.Timestamp)
+
+  def getDummyUsersData: Stream[User] = {
+    val t = System.currentTimeMillis
+    println(s"Time is $t")
+    Stream(
+      User("1","Sunny",new java.sql.Timestamp(t)),
+      User("2","Anurag",new java.sql.Timestamp(t))
+    )
+  }
+
+  def writeData(path:String, data:Stream[User]):Unit = {
+    ParquetWriter.write(path, data)
   }
 
 }
