@@ -42,7 +42,7 @@ import software.amazon.awssdk.regions.Region
 
 import scala.util.Try
 import scala.reflect.ClassTag
-import software.amazon.awssdk.services.glue.model.{CreateTableRequest, DeletePartitionRequest, DeleteTableRequest, EntityNotFoundException, GetTableRequest, SerDeInfo, StorageDescriptor, TableInput, Column => GlueColumn}
+import software.amazon.awssdk.services.glue.model.{CreateTableRequest, DeletePartitionRequest, DeleteTableRequest, EntityNotFoundException, GetTableRequest, SerDeInfo, StorageDescriptor, TableInput, UpdateTableRequest, Column => GlueColumn}
 import java.util.Date
 
 import collection.JavaConverters._
@@ -106,10 +106,15 @@ object GlueUtils {
     }
   }
 
-  def getPartition(FieldInfos:Fields):(S3FilesList, PartitionDetails) = {
-    ( Seq[String](), KeyPrefixPartition("") )
-  }
-  
+  //TODO: Implement this
+//  def getPartition(FieldInfos:Fields):(S3FilesList, PartitionDetails) = {
+
+//    val req = GetTableRequest.builder().databaseName(tableDetails.db).name(tableDetails.name).build()
+//    Try { glueClient.getTable(req) }.map(_.table().name() == tableDetails.name).recover{
+//      case _:EntityNotFoundException => false
+//    }
+//  }
+
   def createTable(
     tableDetails:TableDetails, partitionKeys: Fields, 
     fields:Fields, location:String, fileFormat: GlueFileFormat
@@ -133,6 +138,23 @@ object GlueUtils {
 
     }
 
+  def alterTableLocation(tableDetails:TableDetails, location:String)(implicit glueClient:GlueClient):Try[Unit] = Try {
+    val req = GetTableRequest.builder().databaseName(tableDetails.db).name(tableDetails.name).build()
+    val getTableResp = glueClient.getTable(req)
+    val table = getTableResp.table()
+
+    val storageDescriptor = table.storageDescriptor().toBuilder.location(location).build()
+    val tableInput = TableInput.builder().
+      name(table.name()).
+      tableType(table.tableType()).
+      partitionKeys(table.partitionKeys()).
+      storageDescriptor(storageDescriptor).
+      build()
+    val updateTableRequest = UpdateTableRequest.builder().databaseName(tableDetails.db).tableInput(tableInput).build()
+    glueClient.updateTable(updateTableRequest)
+  }
+
+
   def createStorageDescriptor(location:String, fields: Fields, fileFormat: GlueFileFormat):StorageDescriptor = {
     StorageDescriptor.builder()
       .location(location)
@@ -149,7 +171,7 @@ object GlueUtils {
       .build()
   }
 
-  def isTableExists(tableDetails:TableDetails) (implicit glueClient:GlueClient):Try[Boolean] = {
+  def doesTableExists(tableDetails:TableDetails)(implicit glueClient:GlueClient):Try[Boolean] = {
     val req = GetTableRequest.builder().databaseName(tableDetails.db).name(tableDetails.name).build()
     Try { glueClient.getTable(req) }.map(_.table().name() == tableDetails.name).recover{
       case _:EntityNotFoundException => false
