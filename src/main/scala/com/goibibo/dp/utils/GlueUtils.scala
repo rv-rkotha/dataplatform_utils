@@ -171,7 +171,7 @@ object GlueUtils {
       .build()
   }
 
-  def doesTableExists(tableDetails:TableDetails)(implicit glueClient:GlueClient):Try[Boolean] = {
+  def doesTableExist(tableDetails:TableDetails)(implicit glueClient:GlueClient):Try[Boolean] = {
     val req = GetTableRequest.builder().databaseName(tableDetails.db).name(tableDetails.name).build()
     Try { glueClient.getTable(req) }.map(_.table().name() == tableDetails.name).recover{
       case _:EntityNotFoundException => false

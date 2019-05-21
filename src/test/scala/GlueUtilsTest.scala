@@ -57,7 +57,7 @@ class GlueUtilsTest extends FlatSpec with Matchers {
     GlueUtils.dropTable(tableDetails)
     GlueUtils.createTable(tableDetails,partitionKeys, fields, location,ParquetFormat).get
 
-    assert(GlueUtils.doesTableExists(tableDetails).get == true)
+    assert(GlueUtils.doesTableExist(tableDetails).get == true)
 
     var usersR = Seq[User]()
     for(
@@ -77,7 +77,7 @@ class GlueUtilsTest extends FlatSpec with Matchers {
     assert(usersR.toList.sortBy(_.id).map(_.created.getTime) == users.toList.sortBy(_.id).map(_.created.getTime))
 
     GlueUtils.dropTable(tableDetails)
-    assert(GlueUtils.doesTableExists(tableDetails).get == false)
+    assert(GlueUtils.doesTableExist(tableDetails).get == false)
     S3Utils.deleteS3Data(path)
     client.close
   }
@@ -103,7 +103,7 @@ class GlueUtilsTest extends FlatSpec with Matchers {
     GlueUtils.dropTable(tableDetails)
     GlueUtils.createTable(tableDetails,partitionKeys, fields, location,ParquetFormat).get
 
-    assert(GlueUtils.doesTableExists(tableDetails).get == true)
+    assert(GlueUtils.doesTableExist(tableDetails).get == true)
     val modifiedUsers = getDummyUsersData.filter(_.name == "Sunny")
     val newLocation      = "s3://tmp-data-platform/test-sunny_1/"
     val newPath = newLocation.replace("s3","s3a") + "test.parquet"
@@ -131,7 +131,7 @@ class GlueUtilsTest extends FlatSpec with Matchers {
     S3Utils.deleteS3Data(newPath)
     S3Utils.deleteS3Data(path)
     GlueUtils.dropTable(tableDetails)
-    assert(GlueUtils.doesTableExists(tableDetails).get == false)
+    assert(GlueUtils.doesTableExist(tableDetails).get == false)
     client.close
   }
 
