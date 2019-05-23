@@ -2,11 +2,10 @@ package com.goibibo.dp.utils
 
 import com.amazonaws.services.glue.AWSGlueClient
 import com.amazonaws.services.glue.model.{GetTableRequest, UpdateTableRequest,TableInput}
-import com.amazonaws.regions.{Region,Regions}
 
 import org.json4s._
 import org.json4s.jackson.Serialization
-import org.json4s.jackson.Serialization.{read, write}
+import org.json4s.jackson.Serialization.write
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.delta.DeltaLog
