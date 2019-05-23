@@ -23,7 +23,8 @@ object DeltaUtils {
   def deltaToGlue(spark: SparkSession, tablePathS3: String,
                   db: String, tableName: String): Try[Unit] = {
 
-    val deltaLog = DeltaLog.forTable(spark, tablePathS3)
+    val normalizedTablePathS3 = normalizeS3Path(tablePathS3)
+    val deltaLog = DeltaLog.forTable(spark, normalizedTablePathS3)
 
     /*
      DeltaLog internally uses snapshot to get the list of files,
@@ -34,7 +35,7 @@ object DeltaUtils {
 
     val entries = currentSnapShotFiles.map(
       a => {
-        val url = tablePathS3 + a.path.toString
+        val url = normalizedTablePathS3 + a.path.toString
         val meta = ManifestEntryMetadata(a.size)
         ManifestEntries(url, meta)
       })
@@ -43,7 +44,7 @@ object DeltaUtils {
     implicit val formats = Serialization.formats(NoTypeHints)
     val manifestJson = write(manifest)
     val MANIFEST_LOCATION = "_manifests/"
-    val manifestLocation = tablePathS3 + MANIFEST_LOCATION  + System.currentTimeMillis.toString
+    val manifestLocation = normalizedTablePathS3 + MANIFEST_LOCATION  + System.currentTimeMillis.toString
     dbutils.fs.put(manifestLocation, manifestJson)
 
     alterTableLocation(db, tableName, manifestLocation)
@@ -66,5 +67,10 @@ object DeltaUtils {
       withStorageDescriptor(storageDescriptor)
     val updateTableRequest = new UpdateTableRequest().withDatabaseName(db).withTableInput(tableInput)
     glueClient.updateTable(updateTableRequest)
+  }
+
+  private def normalizeS3Path(path: String): String = {
+    val normalizedPath = if (path.endsWith("/")) path else {path + "/"}
+    normalizedPath
   }
 }
