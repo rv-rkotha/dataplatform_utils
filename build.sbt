@@ -2,9 +2,13 @@ name := "dataplatform_utils"
 organization := "com.goibibo"
 version := "2.4"
 scalaVersion := "2.11.12"
+addCompilerPlugin(scalafixSemanticdb) // enable SemanticDB
 javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
-scalacOptions += "-target:jvm-1.8"
-
+scalacOptions ++= List(
+  "-target:jvm-1.8",
+  "-Yrangepos",          // required by SemanticDB compiler plugin
+  "-Ywarn-unused-import" // required by `RemoveUnused` rule
+)
 resolvers += "redshift" at "http://redshift-maven-repository.s3-website-us-east-1.amazonaws.com/release"
 
 libraryDependencies ++= Seq(

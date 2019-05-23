@@ -4,7 +4,6 @@ import java.io.CharArrayWriter
 import com.fasterxml.jackson.core.JsonFactory
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import collection.JavaConverters._
 import scala.reflect.ClassTag
 
 //Hack to access Spark's private classes in org.apache.spark.sql schema
