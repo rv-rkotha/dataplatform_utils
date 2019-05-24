@@ -42,7 +42,7 @@ import software.amazon.awssdk.regions.Region
 
 import scala.util.Try
 import scala.reflect.ClassTag
-import software.amazon.awssdk.services.glue.model.{CreateTableRequest, DeletePartitionRequest, DeleteTableRequest, EntityNotFoundException, GetTableRequest, SerDeInfo, StorageDescriptor, TableInput, UpdateTableRequest, Column => GlueColumn}
+import software.amazon.awssdk.services.glue.model.{CreateTableRequest, DeleteTableRequest, EntityNotFoundException, GetTableRequest, SerDeInfo, StorageDescriptor, TableInput, UpdateTableRequest, Column => GlueColumn}
 import java.util.Date
 
 import collection.JavaConverters._

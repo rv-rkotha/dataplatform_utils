@@ -4,7 +4,6 @@ import java.util.{Timer, TimerTask}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise, TimeoutException}
-import scala.language.postfixOps
 
 object FutureUtils {
 

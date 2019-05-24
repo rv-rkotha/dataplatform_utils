@@ -1,6 +1,5 @@
 package com.goibibo.dp.utils
 import org.slf4j.{Logger, LoggerFactory}
-import java.util.concurrent.{CountDownLatch,TimeUnit}
 
 import org.apache.zookeeper.ZooKeeper
 
