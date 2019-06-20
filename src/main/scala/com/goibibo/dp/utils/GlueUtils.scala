@@ -49,18 +49,18 @@ import collection.JavaConverters._
 
 
 object GlueUtilsTypes {
-  
+
   trait PartitionDetails {}
   case class ManifestPartition(manifestFile:String) extends PartitionDetails
   case class KeyPrefixPartition(path:String) extends PartitionDetails
-  
+
   case class FieldInfo(fieldName:String, fieldType:String)
   case class FieldInfoValue[T:ClassTag](fieldName:String, fieldValue:T) {
     def fieldType = GlueUtilsPrivate.glueType[T]()
   }
-  
+
   case class TableDetails(name:String, db: String)
-  
+
   trait GlueFileFormat {
     def inputFormat:String {}
     def outputFormat:String {}
@@ -79,14 +79,14 @@ object GlueUtilsTypes {
 
   type Fields = Seq[FieldInfo]
   type S3FilesList = Seq[String]
-  
+
   val TABLE_TYPE_EXTERNAL = "EXTERNAL_TABLE"
 }
 
 object GlueUtils {
   import GlueUtilsTypes._
   import GlueUtilsPrivate._
-  
+
   def createPartition(table:TableDetails, partitions:Fields, location:String)
   (implicit glueClient:GlueClient):Try[Unit] = {
     Try{
@@ -116,9 +116,9 @@ object GlueUtils {
 //  }
 
   def createTable(
-    tableDetails:TableDetails, partitionKeys: Fields, 
+    tableDetails:TableDetails, partitionKeys: Fields,
     fields:Fields, location:String, fileFormat: GlueFileFormat
-  ) 
+  )
   (implicit glueClient:GlueClient):Try[Unit] = Try{
 
       val tableStorage = createStorageDescriptor(location, fields, fileFormat)
@@ -128,7 +128,7 @@ object GlueUtils {
       .partitionKeys( fieldInfoToGlueType(partitionKeys):_* )
       .storageDescriptor(tableStorage)
       .build()
-      
+
       val createTableRequest = CreateTableRequest.builder()
       .databaseName(tableDetails.db)
       .tableInput(tableInput)
@@ -138,22 +138,32 @@ object GlueUtils {
 
     }
 
-  def alterTableLocation(tableDetails:TableDetails, location:String)(implicit glueClient:GlueClient):Try[Unit] = Try {
-    val req = GetTableRequest.builder().databaseName(tableDetails.db).name(tableDetails.name).build()
+  def alterTableLocation(tableDetails:TableDetails, location:String,
+                         partitions: Option[Seq[String]] = None)
+                        (implicit glueClient:GlueClient):Try[Unit] = Try {
+    val req = GetTableRequest.builder()
+      .databaseName(tableDetails.db)
+      .name(tableDetails.name)
+      .build()
     val getTableResp = glueClient.getTable(req)
     val table = getTableResp.table()
+
+    val partitionKs: java.util.List[GlueColumn] = partitions match {
+      case None => table.partitionKeys()
+      case Some(columns) => columns.map(column =>
+        GlueColumn.builder.name(column).build).asJava
+    }
 
     val storageDescriptor = table.storageDescriptor().toBuilder.location(location).build()
     val tableInput = TableInput.builder().
       name(table.name()).
       tableType(table.tableType()).
-      partitionKeys(table.partitionKeys()).
+      partitionKeys(partitionKs).
       storageDescriptor(storageDescriptor).
       build()
     val updateTableRequest = UpdateTableRequest.builder().databaseName(tableDetails.db).tableInput(tableInput).build()
     glueClient.updateTable(updateTableRequest)
   }
-
 
   def createStorageDescriptor(location:String, fields: Fields, fileFormat: GlueFileFormat):StorageDescriptor = {
     StorageDescriptor.builder()
@@ -190,10 +200,10 @@ object GlueUtils {
   }
   def alterTableDropField() (implicit glueClient:GlueClient):Try[Unit] = {
     Try{
-      
+
     }
   }
-  
+
   def createGlueClient(region:String = "ap-south-1"):GlueClient = {
     val regionO = Region.of(region)
     GlueClient.builder().region( regionO ).build()
@@ -202,9 +212,9 @@ object GlueUtils {
 
 object GlueUtilsPrivate {
   import GlueUtilsTypes._
-  
+
   def glueType[T:ClassTag]():String = {
-    
+
     val runtimeClassOfT = implicitly[ClassTag[T]].runtimeClass
     if( runtimeClassOfT == classOf[String])     "STRING"
     else if( runtimeClassOfT == classOf[Int])   "INT"
@@ -215,9 +225,9 @@ object GlueUtilsPrivate {
     /* TODO: Not adding additional types as rest of the types are supported in Glue as a partition type */
     else "UNKNOWN"
   }
-  
+
   def fieldInfoToGlueType(fields:Fields):Seq[GlueColumn] = {
     fields.map( a => GlueColumn.builder.name(a.fieldName).`type`(a.fieldType).build() )
   }
-  
+
 }
