@@ -154,7 +154,6 @@ object DeltaUtils {
             file => {
               val url = path + file.path.toString
               val meta = ManifestEntryMetadata(file.size)
-              println(ManifestEntries(url, meta))
               ManifestEntries(url, meta)
             }
           )
