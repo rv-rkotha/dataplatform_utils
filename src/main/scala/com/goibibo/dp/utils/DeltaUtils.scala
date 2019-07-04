@@ -52,10 +52,16 @@ object DeltaUtils {
             tb: GlueUtilsTypes.TableDetails,
             mergeSchema: Boolean = true)(implicit glueClient: GlueClient): Try[Unit] = {
 
-    val hadoopPath = new Path(normalizeS3Path(path))
+    val normalizedTablePathS3 = normalizeS3Path(path)
+    val hadoopPath = new Path(normalizedTablePathS3)
     if (pathExists(spark, hadoopPath)) {
       convertToDelta(spark, hadoopPath, df.schema, partitions)
       deltaToGlue(spark, path, tb.db, tb.name, partitions)
+    }
+
+    // Get old schema
+    val oldSchema = Try {
+      spark.read.format("delta").load(normalizedTablePathS3).schema
     }
 
     partitions match {
@@ -72,7 +78,12 @@ object DeltaUtils {
           .save(path)
     }
 
-    deltaToGlue(spark, path, tb.db, tb.name, partitions)
+    val recreateTable =
+      if (mergeSchema && oldSchema.isSuccess) {
+          if (!(oldSchema.get == df.schema)) true else false
+      } else false
+
+    deltaToGlue(spark, path, tb.db, tb.name, partitions, recreateTable)
   }
 
   /** Checks if a S3 path is a Delta Table or not, and converts it to a Delta Table.
@@ -111,12 +122,20 @@ object DeltaUtils {
     * @param glueClient glueClient to connect to AWS Glue
     */
   def deltaToGlue(spark: SparkSession, path: String,
-                  db: String, tableName: String, partitions: Option[Seq[String]] = None)
+                  db: String, tableName: String, partitions: Option[Seq[String]] = None,
+                  recreateTable: Boolean = false)
                  (implicit glueClient: GlueClient): Try[Unit] = Try {
     // Normalize path so that paths end with /
     val normalizedTablePathS3 = normalizeS3Path(path)
     // Write manifest files for each partition.
     val manifestLocation = writeManifests(spark, normalizedTablePathS3).get
+
+    // Recreate table on schema change.
+    // Warning: Dropping and creating table isn't atomic or isolated.
+    if (recreateTable) {
+      spark.sql(s"""DROP TABLE IF EXISTS ${db}.${tableName}
+                """)
+    }
 
     //Create table in glue if it doesn't exist.
     spark.sql(s"""CREATE TABLE IF NOT EXISTS ${db}.${tableName}
@@ -128,7 +147,6 @@ object DeltaUtils {
     val tbDetails = GlueUtilsTypes.TableDetails(tableName, db)
     // TODO: Get partition info from delta log
     GlueUtils.alterTableLocation(tbDetails, manifestLocation, partitions)
-    // TODO: Check for schema change and correct schema in glue
   }
 
   /** Reads Delta Logs for a Delta Table and generates Spectrum-compatible manifest files.
