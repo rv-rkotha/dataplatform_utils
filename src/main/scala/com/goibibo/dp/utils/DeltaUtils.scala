@@ -24,7 +24,9 @@ import org.json4s.jackson.Serialization.write
 import scala.util.{Try, Failure, Success}
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{StructType, DataType}
+import org.apache.spark.sql.catalyst.analysis
+
 import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
 
 object DeltaUtils {
@@ -46,11 +48,11 @@ object DeltaUtils {
     * @param mergeSchema If true, merges schema in case of compatible schema change, if false, write will fail.
     */
   def writeDF(spark: SparkSession,
-            df: DataFrame,
-            path: String,
-            partitions: Option[Seq[String]] = None,
-            tb: GlueUtilsTypes.TableDetails,
-            mergeSchema: Boolean = true)(implicit glueClient: GlueClient): Try[Unit] = {
+              df: DataFrame,
+              path: String,
+              partitions: Option[Seq[String]] = None,
+              tb: GlueUtilsTypes.TableDetails,
+              mergeSchema: Boolean = true)(implicit glueClient: GlueClient): Try[Unit] = {
 
     val normalizedTablePathS3 = normalizeS3Path(path)
     val hadoopPath = new Path(normalizedTablePathS3)
@@ -64,23 +66,31 @@ object DeltaUtils {
       spark.read.format("delta").load(normalizedTablePathS3).schema
     }
 
-    partitions match {
-      case None => df.write
-          .format("delta")
-          .mode("append")
-          .option("mergeSchema", mergeSchema.toString)
-          .save(path)
-      case Some(partitions) => df.write
-          .format("delta")
-          .partitionBy(partitions:_*)
-          .mode("append")
-          .option("mergeSchema", mergeSchema.toString)
-          .save(path)
+    val writeStatus = Try {
+      partitions match {
+        case None => df.write
+            .format("delta")
+            .mode("append")
+            .option("mergeSchema", mergeSchema.toString)
+            .save(path)
+        case Some(partitions) => df.write
+            .format("delta")
+            .partitionBy(partitions:_*)
+            .mode("append")
+            .option("mergeSchema", mergeSchema.toString)
+            .save(path)
+      }
     }
+
+    if (writeStatus.isFailure) return writeStatus
+
+    val newSchema = spark.read.format("delta").load(normalizedTablePathS3).schema
 
     val recreateTable =
       if (mergeSchema && oldSchema.isSuccess) {
-          if (!(oldSchema.get == df.schema)) true else false
+        if (!DataType.canWrite(newSchema, oldSchema.get,
+                               analysis.caseInsensitiveResolution,
+                               "record")) true else false
       } else false
 
     deltaToGlue(spark, path, tb.db, tb.name, partitions, recreateTable)
@@ -138,12 +148,15 @@ object DeltaUtils {
     }
 
     //Create table in glue if it doesn't exist.
+    //We need the mergeSchema option true to get the correct schema in Glue.
+    spark.sql("SET spark.sql.parquet.mergeSchema=true")
     spark.sql(s"""CREATE TABLE IF NOT EXISTS ${db}.${tableName}
                     USING PARQUET
                     LOCATION "${normalizedTablePathS3}"
                     """)
+    spark.sql("SET spark.sql.parquet.mergeSchema=false")
 
-    // Alter table location to point to manifest file(for single partition) or root path(for multiple partitions) .
+    // Alter table location to point to manifest file(for single partition) or root path(for multiple partitions).
     val tbDetails = GlueUtilsTypes.TableDetails(tableName, db)
     // TODO: Get partition info from delta log
     GlueUtils.alterTableLocation(tbDetails, manifestLocation, partitions)
