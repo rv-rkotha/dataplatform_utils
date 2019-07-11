@@ -1,3 +1,5 @@
+import scala.sys.process._
+
 name := "dataplatform_utils"
 organization := "com.goibibo"
 version := "2.4"
@@ -75,7 +77,7 @@ libraryDependencies ++= Seq(
    as dependency.
    */
   "com.amazon.redshift" % "redshift-jdbc4" % "1.2.20.1043" % "provided",
-  "com.fasterxml.jackson.core" % "jackson-core" % "2.9.8" % "provided",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.6.7" % "provided",
 
   "software.amazon.awssdk" % "glue" % "2.5.66",
   "software.amazon.awssdk" % "redshift" % "2.5.66",
@@ -90,7 +92,9 @@ libraryDependencies ++= Seq(
 )
 
 assemblyShadeRules in assembly := Seq(
+  // We are building our code against open source delta but shading allows us to run against commercial delta
   ShadeRule.rename("org.apache.spark.sql.delta.**" -> "com.databricks.sql.transaction.tahoe.@1").inAll,
+  // This clashes with built in libraries in spark. So we shade it.
   ShadeRule.rename("org.apache.http.**" -> "shadedhttp.@1").inAll
 )
 
