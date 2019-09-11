@@ -34,8 +34,6 @@ import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.catalog.{CatalogUtils, CatalogTable, CatalogTableType, CatalogTablePartition, CatalogStorageFormat}
 import org.apache.spark.sql.catalyst.TableIdentifier
 
-import org.apache.spark.sql.types._
-
 import org.apache.hadoop.hive.metastore.api.{Partition, StorageDescriptor, SerDeInfo}
 import collection.JavaConverters._
 
@@ -53,7 +51,7 @@ object DeltaUtils {
               path: String,
               partitions: Option[Seq[String]] = None,
               tb: GlueUtilsTypes.TableDetails,
-              mergeSchema: Boolean = true)(implicit glueClient: GlueClient): Try[Any] = Try {
+              mergeSchema: Boolean = true)(implicit glueClient: GlueClient): Try[Unit] = Try {
 
     val normalizedTablePathS3 = normalizeS3Path(path)
     val hadoopPath = new Path(normalizedTablePathS3)
@@ -61,8 +59,7 @@ object DeltaUtils {
       convertToDelta(spark, hadoopPath, df.schema, partitions)
     }
 
-    val writeStatus = Try {
-      partitions match {
+    partitions match {
         case None => df.write
             .format("delta")
             .mode("append")
@@ -75,9 +72,6 @@ object DeltaUtils {
             .option("mergeSchema", mergeSchema.toString)
             .save(path)
       }
-    }
-
-    if (writeStatus.isFailure) return writeStatus
 
     deltaToGlue(spark, path, tb.db, tb.name, mergeSchema, partitions).get
   } recoverWith {
@@ -135,19 +129,21 @@ object DeltaUtils {
     val deltaLog = DeltaLog.forTable(spark, path)
     val latestDeltaVersion = deltaLog.history.getHistory(Some(1))(0).version.get
 
-    val(lastReadDeltaVersion: Option[Long], oldSchema: Option[StructType]) = if (catalog.tableExists(dbName, tableName)) {
+    val(lastWrittenDeltaVersion, oldSchema) = if (catalog.tableExists(dbName, tableName)) {
       val table = catalog.getTable(dbName, tableName)
-      val lastReadDeltaVersion = Try{Some(table.properties("deltaVersion").toLong)}.getOrElse(None)
+      val lastWrittenDeltaVersion = Try{
+        Some(table.properties("deltaVersion").toLong)
+      }.getOrElse(None)
       val oldSchema = Some(table.schema)
-      (lastReadDeltaVersion, oldSchema)
+      (lastWrittenDeltaVersion, oldSchema)
     } else (None, None)
-    println(s"Last Glue Delta Version: ${lastReadDeltaVersion}")
+    println(s"Last Glue Delta Version: ${lastWrittenDeltaVersion}")
     println(s"Latest Delta Version: ${latestDeltaVersion}")
     println(s"Old Schema: ${oldSchema}")
 
     // Write manifest files for each partition.
     val partResp = writeManifests(spark, normalizedTablePathS3,
-                                  (lastReadDeltaVersion.map(_+1),
+                                  (lastWrittenDeltaVersion.map(_+1),
                                    latestDeltaVersion),
                                   tryIncremental = true).get
     val catalogPartitions = partResp.map{case(cp, l) => cp}
@@ -209,15 +205,15 @@ object DeltaUtils {
       val manifestLocation = partResp.map{case(cp, l) => l}.head
       GlueUtils.alterTableLocation(tbDetails, manifestLocation, None).get
     } else {
-      // Alter table properties to set deltaVersion
-      // This only needs to be done for partitioned tables.
-      catalog.alterTable(catalogTable)
       // Create or replace partitions.
       // All partitions have their locations updated to the new manifest file.
       catalog.createPartitions(dbName, tableName, catalogPartitions, ignoreIfExists = true)
       // Set partition locations. This cannot be done through the catalog interface,
       // as hive doesn't support manifest files for location.
       msc.alter_partitions(dbName, tableName, partitions.asJava)
+      // Alter table properties to set deltaVersion
+      // Only needed for partitioned tables.
+      catalog.alterTable(catalogTable)
     }
   } recoverWith {
     case t: Throwable => t.printStackTrace(); Failure(t)
@@ -245,17 +241,24 @@ object DeltaUtils {
       proceedWithIncremental = false
     }
 
-
     val files = (startingDeltaVersion to latestDeltaVersion).map( v =>
       f"${path}/_delta_log/$v%020d.json"
     )
 
+    def to_sorted_str = (s: Map[String, String]) => {
+      s.toSeq.sorted.toMap.toString
+    }
+
+    val to_str = spark.udf.register("to_str", to_sorted_str)
     val partitionsChanged = if (proceedWithIncremental) Try {
       spark.read.json(files: _*)
         .where("add is not null")
-        .selectExpr("to_json(add.partitionValues)")
+        .select(to_json($"add.partitionValues").as("jv"))
+        .select(from_json($"jv", MapType(StringType, StringType, false)).as("mv"))
+        .select(to_str($"mv"))
         .as[String]
         .collect
+        .distinct
     }.toOption else None
 
     println("Changed partitions:")
@@ -267,7 +270,7 @@ object DeltaUtils {
 
     val filteredPartitionValues = if (partitionsChanged.isEmpty) allPartitionValues
                                   else {
-                                    allPartitionValues.where($"partition_values".isin(partitionsChanged.get: _*))
+                                    allPartitionValues.where(to_str($"partitionValues").isin(partitionsChanged.get: _*))
                                   }
 
     println("Writing to partitions:")
