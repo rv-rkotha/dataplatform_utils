@@ -46,6 +46,11 @@ case class ManifestEntries(url:String, meta:ManifestEntryMetadata)
 case class Manifest(entries:Seq[ManifestEntries])
 
 object DeltaUtils {
+
+  sealed trait DeltaTableSpec
+  final case class DPath(path: String) extends DeltaTableSpec
+  final case class DTable(table: String) extends DeltaTableSpec
+
   def writeDF(spark: SparkSession,
               df: DataFrame,
               path: String,
@@ -60,20 +65,20 @@ object DeltaUtils {
     }
 
     partitions match {
-        case None => df.write
-            .format("delta")
-            .mode("append")
-            .option("mergeSchema", mergeSchema.toString)
-            .save(path)
-        case Some(partitions) => df.write
-            .format("delta")
-            .partitionBy(partitions:_*)
-            .mode("append")
-            .option("mergeSchema", mergeSchema.toString)
-            .save(path)
-      }
+      case None => df.write
+          .format("delta")
+          .mode("append")
+          .option("mergeSchema", mergeSchema.toString)
+          .save(path)
+      case Some(partitions) => df.write
+          .format("delta")
+          .partitionBy(partitions:_*)
+          .mode("append")
+          .option("mergeSchema", mergeSchema.toString)
+          .save(path)
+    }
 
-    deltaToGlue(spark, path, tb.db, tb.name, mergeSchema, partitions).get
+    deltaToGlue(spark, DPath(path), tb.db, tb.name, mergeSchema, partitions).get
   } recoverWith {
     case t: Throwable => t.printStackTrace; Failure(t)
   }
@@ -113,7 +118,7 @@ object DeltaUtils {
     * @param partitions Partitions for the table
     * @param glueClient glueClient to connect to AWS Glue
     */
-  def deltaToGlue(spark: SparkSession, path: String,
+  def deltaToGlue(spark: SparkSession, deltaTable: DeltaTableSpec,
                   dbName: String, tableName: String,
                   mergeSchema: Boolean = true,
                   partitionColumns: Option[Seq[String]] = None,
@@ -122,11 +127,19 @@ object DeltaUtils {
     import spark.implicits._
 
     // Normalize path so that paths end with /
-    val normalizedTablePathS3 = normalizeS3Path(path)
-
     val catalog = spark.sharedState.externalCatalog
+    val normalizedTablePathS3 = normalizeS3Path(
+      deltaTable match {
+        case DPath(p) => p
+        case DTable(t) => {
+          val tbDetails = t.split('.')
+          if (tbDetails.size != 2) throw new Exception("Invalid Table Name")
+          catalog.getTable(tbDetails(0), tbDetails(1)).storage.locationUri.get.toString
+        }
+      })
+
     val msc = org.apache.spark.sql.hive.GoHiveUtils.getMSC(spark).get
-    val deltaLog = DeltaLog.forTable(spark, path)
+    val deltaLog = DeltaLog.forTable(spark, normalizedTablePathS3)
     val latestDeltaVersion = deltaLog.history.getHistory(Some(1))(0).version.get
 
     val(lastWrittenDeltaVersion, oldSchema) = if (catalog.tableExists(dbName, tableName)) {
