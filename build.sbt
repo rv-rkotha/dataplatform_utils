@@ -4,7 +4,6 @@ name := "dataplatform_utils"
 organization := "com.goibibo"
 version := "2.4"
 scalaVersion := "2.11.12"
-ensimeScalaVersion in ThisBuild := "2.11.12"
 addCompilerPlugin(scalafixSemanticdb) // enable SemanticDB
 javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 scalacOptions ++= List(
@@ -76,7 +75,9 @@ libraryDependencies ++= Seq(
    kShift imports this library and adds kafka + spark-streaming-kafka-0-10 + zookeeper
    as dependency.
    */
-  "com.amazon.redshift" % "redshift-jdbc4" % "1.2.20.1043" % "provided",
+  "com.amazon.redshift" % "redshift-jdbc4" % "1.2.20.1043" % "provided" excludeAll(
+    ExclusionRule(organization = "com.amazonaws.auth")
+  ),
   "com.fasterxml.jackson.core" % "jackson-core" % "2.6.7" % "provided",
 
   "software.amazon.awssdk" % "glue" % "2.5.66",
