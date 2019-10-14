@@ -32,6 +32,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % "2.4.3" % "provided",
   "org.apache.spark" %% "spark-streaming" % "2.4.3" % "provided",
   "org.apache.spark" %% "spark-catalyst" % "2.4.3" % "provided",
+  "org.apache.spark" %% "spark-hive" % "2.4.3" % "provided",
 
   "joda-time"         %   "joda-time"     % "2.9.3" % "provided",
   "org.slf4j"         %   "slf4j-api"     % "1.7.16" % "provided",
@@ -39,6 +40,9 @@ libraryDependencies ++= Seq(
   "org.apache.zookeeper" %   "zookeeper" % "3.4.6" % "provided",
   "org.apache.kafka" % "kafka-clients" % "2.0.0" % "provided",
   "org.apache.spark" %% "spark-streaming-kafka-0-10" % "2.4.3" % "provided",
+  "org.spark-project.hive" % "hive-metastore" % "1.2.1.spark2" % "provided",
+
+
   /*
    Provided because, It will always be available on databricks,
    To run on EMR, add it in her app's sbt file
@@ -47,7 +51,7 @@ libraryDependencies ++= Seq(
   "io.delta" %% "delta-core" % "0.1.0" % "provided",
 
   /*
-   This is required only for the test-cases, so kept in "test".
+   This is required only for test-cases, so kept in "test".
    */
   "org.apache.hadoop" % "hadoop-common" % "2.9.2" % "test",
   "org.apache.hadoop" % "hadoop-aws" % "2.9.2" % "test",
