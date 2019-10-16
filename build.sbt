@@ -94,6 +94,14 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.7" % "test",
   /* Pureconfig is only used in test. */
   "com.github.pureconfig" %% "pureconfig" % "0.10.2" % "test",
+  "com.holdenkarau" %% "spark-testing-base" % "2.3.1_0.12.0" % "test",
+  )
+
+parallelExecution in Test := false
+
+dependencyOverrides ++= Seq(
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.7",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.6.7",
 )
 
 assemblyShadeRules in assembly := Seq(

@@ -21,6 +21,12 @@ import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.{StructType, DataType}
 import org.apache.spark.sql.catalyst.analysis
 
+import java.net.URI
+
+import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.conf.Configuration
+
+
 import org.json4s._
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.write
@@ -51,11 +57,13 @@ object DeltaUtils {
   final case class DPath(path: String) extends DeltaTableSpec
   final case class DTable(table: String) extends DeltaTableSpec
 
+  case class SpectrumTable(table: String)
+
   def writeDF(spark: SparkSession,
               df: DataFrame,
               path: String,
               partitions: Option[Seq[String]] = None,
-              tb: GlueUtilsTypes.TableDetails,
+              tb: SpectrumTable,
               mergeSchema: Boolean = true)(implicit glueClient: GlueClient): Try[Unit] = Try {
 
     val normalizedTablePathS3 = normalizeS3Path(path)
@@ -78,7 +86,7 @@ object DeltaUtils {
           .save(path)
     }
 
-    deltaToGlue(spark, DPath(path), tb.db, tb.name, mergeSchema, partitions).get
+    deltaToGlue(spark, DPath(path), tb, mergeSchema, partitions).get
   } recoverWith {
     case t: Throwable => t.printStackTrace; Failure(t)
   }
@@ -119,7 +127,7 @@ object DeltaUtils {
     * @param glueClient glueClient to connect to AWS Glue
     */
   def deltaToGlue(spark: SparkSession, deltaTable: DeltaTableSpec,
-                  dbName: String, tableName: String,
+                  spectrumTable: SpectrumTable,
                   mergeSchema: Boolean = true,
                   partitionColumns: Option[Seq[String]] = None,
                   tableProperties: Map[String, String] = Map.empty[String, String])
@@ -132,11 +140,14 @@ object DeltaUtils {
       deltaTable match {
         case DPath(p) => p
         case DTable(t) => {
-          val tbDetails = t.split('.')
-          if (tbDetails.size != 2) throw new Exception("Invalid Table Name")
-          catalog.getTable(tbDetails(0), tbDetails(1)).storage.locationUri.get.toString
+          val tbDetails = getTableDetails(t)
+          catalog.getTable(tbDetails._1, tbDetails._2).storage.locationUri.get.toString
         }
       })
+
+    val(dbName, tableName) = spectrumTable match {
+      case SpectrumTable(t) => getTableDetails(t)
+    }
 
     val msc = org.apache.spark.sql.hive.GoHiveUtils.getMSC(spark).get
     val deltaLog = DeltaLog.forTable(spark, normalizedTablePathS3)
@@ -355,7 +366,7 @@ object DeltaUtils {
     val MANIFEST_DIR = "_manifests/"
     val manifestLocation = partitionLocation + MANIFEST_DIR + deltaVersion
     val hadoopPath = new Path(manifestLocation)
-    val fs = org.apache.hadoop.fs.FileSystem.get(hadoopPath.toUri, new org.apache.hadoop.conf.Configuration())
+    val fs = FileSystem.get(hadoopPath.toUri, new Configuration())
     val fileStream = fs.create(hadoopPath, true)
     fileStream.write(manifestJson.getBytes)
     fileStream.close
@@ -367,7 +378,9 @@ object DeltaUtils {
     * @param path S3 path
     */
   private def pathExists(spark: SparkSession, path: Path): Boolean = {
-    val fs = path.getFileSystem(spark.sessionState.newHadoopConf())
+    val fs: FileSystem = FileSystem.get(
+      new URI(path.toString),
+      new Configuration())
     Try(fs.exists(path)).getOrElse(false)
   }
 
@@ -375,7 +388,12 @@ object DeltaUtils {
     * @param path S3 path
     */
   private def emptyDir(path: Path) : Boolean = {
-    Try(dbutils.fs.ls(path.toUri().toString).size).getOrElse(0) != 0
+    Try{
+      val fs: FileSystem = FileSystem.get(
+        new URI(path.toString),
+        new Configuration())
+      fs.getContentSummary(path).getFileCount()
+    }.getOrElse(0) != 0
   }
 
   /** Checks for trailing slash in S3 path and adds one if missing
@@ -385,6 +403,13 @@ object DeltaUtils {
     val normalizedPath = if (path.endsWith("/")) path else {path + "/"}
     normalizedPath
   }
+
+  private def getTableDetails(table: String): (String, String) = {
+    val tbDetails = table.split('.')
+    if (tbDetails.size != 2) throw new Exception("Invalid Table Name")
+    return (tbDetails(0), tbDetails(1))
+  }
+
 
   private def toHivePartition(spark: SparkSession, p: CatalogTablePartition, ct: CatalogTable, dbName:String, tableName: String, location: Option[String]): Try[Partition] = Try {
     val tpart = new org.apache.hadoop.hive.metastore.api.Partition
