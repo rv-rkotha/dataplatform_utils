@@ -214,9 +214,10 @@ object DeltaUtils {
 
     val alterSchema =
       if (mergeSchema && !oldSchema.isEmpty) {
-        if (!DataType.canWrite(schema, oldSchema.get,
-                               analysis.caseInsensitiveResolution,
-                               "record")) true else false
+        if (!DataType.canWrite(write = schema, read = oldSchema.get,
+                               resolver = analysis.caseInsensitiveResolution,
+                               context = "record",
+                               addError = (s) => logger.error(s))) true else false
       } else false
 
     if (alterSchema) {
