@@ -68,7 +68,7 @@ class DeltaUtilsTest extends FlatSpec with Matchers with PrivateMethodTester wit
                  ("Steve", 12, 52),
                  ("Phil", 15, 23)).toDF("name","score", "age")
     df.write.format("delta").mode("overwrite").save(path)
-    deltaToGlue(sparkSession, DPath(path), SpectrumTable("goibibo_e.delta_test1")).get
+    deltaToGlue(sparkSession, DPath(path), STable("goibibo_e.delta_test1")).get
     S3Utils.deleteS3Data(path)
     sparkSession.sharedState.externalCatalog.dropTable("goibibo_e", "delta_test1", ignoreIfNotExists = true, purge = true)
   }
@@ -93,7 +93,7 @@ class DeltaUtilsTest extends FlatSpec with Matchers with PrivateMethodTester wit
                  ("Steve", 12, 52),
                  ("Phil", 15, 23)).toDF("name","score", "age")
     df.write.format("delta").mode("overwrite").saveAsTable(table)
-    deltaToGlue(sparkSession, DTable(table), SpectrumTable("goibibo_e.delta_test20")).get
+    deltaToGlue(sparkSession, DTable(table), STable("goibibo_e.delta_test20")).get
     sparkSession.sharedState.externalCatalog.dropTable("goibibo_e", "delta_test2", ignoreIfNotExists = true, purge = true)
     sparkSession.sharedState.externalCatalog.dropTable("goibibo_e", "delta_test20", ignoreIfNotExists = true, purge = true)
   }
@@ -118,7 +118,7 @@ class DeltaUtilsTest extends FlatSpec with Matchers with PrivateMethodTester wit
                  ("Phil", 15, 23)).toDF("name","score", "age")
     df.write.format("delta").mode("append").save(path)
     df.write.format("delta").mode("append").save(path)
-    deltaToGlue(sparkSession, DPath(path), SpectrumTable("goibibo_e.delta_test3")).get
+    deltaToGlue(sparkSession, DPath(path), STable("goibibo_e.delta_test3")).get
     S3Utils.deleteS3Data(path)
     sparkSession.sharedState.externalCatalog.dropTable("goibibo_e", "delta_test3", ignoreIfNotExists = true, purge = true)
   }
@@ -142,7 +142,7 @@ class DeltaUtilsTest extends FlatSpec with Matchers with PrivateMethodTester wit
                  ("Steve", 12, 52),
                  ("Phil", 15, 23)).toDF("name","score", "age")
     df.write.format("delta").partitionBy("age").mode("append").save(path)
-    deltaToGlue(sparkSession, DPath(path), SpectrumTable("goibibo_e.delta_test4")).get
+    deltaToGlue(sparkSession, DPath(path), STable("goibibo_e.delta_test4")).get
     S3Utils.deleteS3Data(path)
     sparkSession.sharedState.externalCatalog.dropTable("goibibo_e", "delta_test4", ignoreIfNotExists = true, purge = true)
   }
@@ -167,9 +167,9 @@ class DeltaUtilsTest extends FlatSpec with Matchers with PrivateMethodTester wit
                  ("Steve", 12, 52),
                  ("Phil", 15, 23)).toDF("name","score", "age")
     df.write.format("delta").mode("append").save(path)
-    deltaToGlue(sparkSession, DPath(path), SpectrumTable("goibibo_e.delta_test5")).get
+    deltaToGlue(sparkSession, DPath(path), STable("goibibo_e.delta_test5")).get
     df.write.format("delta").mode("append").save(path)
-    deltaToGlue(sparkSession, DPath(path), SpectrumTable("goibibo_e.delta_test5")).get
+    deltaToGlue(sparkSession, DPath(path), STable("goibibo_e.delta_test5")).get
     S3Utils.deleteS3Data(path)
     sparkSession.sharedState.externalCatalog.dropTable("goibibo_e", "delta_test5", ignoreIfNotExists = true, purge = true)
   }

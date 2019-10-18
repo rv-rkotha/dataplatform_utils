@@ -4,6 +4,8 @@ import org.json4s._
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization.write
 
+import org.slf4j.{Logger, LoggerFactory}
+
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.delta.DeltaLog
 import org.apache.spark.sql.delta.DeltaTableUtils._
@@ -45,8 +47,6 @@ import collection.JavaConverters._
 
 import org.apache.spark.sql.delta.storage.LogStore
 
-import com.databricks.dbutils_v1.DBUtilsHolder.dbutils
-
 case class ManifestEntryMetadata(content_length:Long)
 case class ManifestEntries(url:String, meta:ManifestEntryMetadata)
 case class Manifest(entries:Seq[ManifestEntries])
@@ -57,13 +57,16 @@ object DeltaUtils {
   final case class DPath(path: String) extends DeltaTableSpec
   final case class DTable(table: String) extends DeltaTableSpec
 
-  case class SpectrumTable(table: String)
+  case class STable(table: String)
+
+  @transient
+  private lazy val logger: Logger = LoggerFactory.getLogger(ZkUtils.getClass)
 
   def writeDF(spark: SparkSession,
               df: DataFrame,
               path: String,
               partitions: Option[Seq[String]] = None,
-              tb: SpectrumTable,
+              tb: STable,
               mergeSchema: Boolean = true)(implicit glueClient: GlueClient): Try[Unit] = Try {
 
     val normalizedTablePathS3 = normalizeS3Path(path)
@@ -127,7 +130,7 @@ object DeltaUtils {
     * @param glueClient glueClient to connect to AWS Glue
     */
   def deltaToGlue(spark: SparkSession, deltaTable: DeltaTableSpec,
-                  spectrumTable: SpectrumTable,
+                  spectrumTable: STable,
                   mergeSchema: Boolean = true,
                   partitionColumns: Option[Seq[String]] = None,
                   tableProperties: Map[String, String] = Map.empty[String, String])
@@ -146,7 +149,7 @@ object DeltaUtils {
       })
 
     val(dbName, tableName) = spectrumTable match {
-      case SpectrumTable(t) => getTableDetails(t)
+      case STable(t) => getTableDetails(t)
     }
 
     val msc = org.apache.spark.sql.hive.GoHiveUtils.getMSC(spark).get
@@ -161,9 +164,9 @@ object DeltaUtils {
       val oldSchema = Some(table.schema)
       (lastWrittenDeltaVersion, oldSchema)
     } else (None, None)
-    println(s"Last Glue Delta Version: ${lastWrittenDeltaVersion}")
-    println(s"Latest Delta Version: ${latestDeltaVersion}")
-    println(s"Old Schema: ${oldSchema}")
+    logger.debug(s"Last Glue Delta Version: ${lastWrittenDeltaVersion}")
+    logger.debug(s"Latest Delta Version: ${latestDeltaVersion}")
+    logger.debug(s"Old Schema: ${oldSchema}")
 
     // Write manifest files for each partition.
     val partResp = writeManifests(spark, normalizedTablePathS3,
@@ -173,7 +176,7 @@ object DeltaUtils {
     val catalogPartitions = partResp.map{case(cp, l) => cp}
 
     val schema = spark.table(s"delta.`${normalizedTablePathS3}`").schema
-    println(s"New Schema: ${schema}")
+    logger.debug(s"New Schema: ${schema}")
     // Infer partition columns from delta if not provided.
     val partitionColumnNames: Seq[String] = partitionColumns.getOrElse(
       spark.sql(s"describe DETAIL delta.`${normalizedTablePathS3}`")
@@ -261,7 +264,7 @@ object DeltaUtils {
 
     var proceedWithIncremental = tryIncremental
     if (!isRangeValid(spark, path, deltaVersionRange)) {
-      println("WARNING: Unable to run manifests incrementally. Writing it for all partitions.")
+      logger.warn("Unable to run manifests incrementally. Writing it for all partitions.")
       proceedWithIncremental = false
     }
 
@@ -285,8 +288,8 @@ object DeltaUtils {
         .distinct
     }.toOption else None
 
-    println("Changed partitions:")
-    partitionsChanged.getOrElse(Array()).foreach(p => println(p))
+    logger.debug("Changed partitions:")
+    partitionsChanged.getOrElse(Array()).foreach(p => logger.debug(p.toString))
 
     val deltaLog = DeltaLog.forTable(spark, path)
     val allPartitionValues = deltaLog.snapshot.allFiles
@@ -297,8 +300,8 @@ object DeltaUtils {
                                     allPartitionValues.where(to_str($"partitionValues").isin(partitionsChanged.get: _*))
                                   }
 
-    println("Writing to partitions:")
-    filteredPartitionValues.collect.foreach(p => println(p))
+    logger.debug("Writing to partitions:")
+    filteredPartitionValues.collect.foreach(p => logger.debug(p.toString))
 
     val partitionData =
       filteredPartitionValues
@@ -361,7 +364,9 @@ object DeltaUtils {
   }
 
   private def writeManifest(partitionValue: Map[String, String], manifestJson: String, path: String, deltaVersion: Long): (String, String) = {
-    val partitionPath = partitionValue.map{case (k, v) => println(k); println(v); s"${k}=${v}/"}.mkString
+    val partitionPath = partitionValue.map{case (k, v) =>
+      logger.debug(k); logger.debug(v);
+      s"${k}=${v}/"}.mkString
     val partitionLocation = path + partitionPath
     val MANIFEST_DIR = "_manifests/"
     val manifestLocation = partitionLocation + MANIFEST_DIR + deltaVersion
