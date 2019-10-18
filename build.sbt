@@ -2,7 +2,7 @@ import scala.sys.process._
 
 name := "dataplatform_utils"
 organization := "com.goibibo"
-version := "2.4"
+version := "2.4.4.1"
 scalaVersion := "2.11.12"
 addCompilerPlugin(scalafixSemanticdb) // enable SemanticDB
 javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -20,7 +20,7 @@ libraryDependencies ++= Seq(
    and if we don't include it then almost all our users will have to include it.
    */
   "com.jsuereth" %% "scala-arm" % "2.0",
-
+  "com.thesamet.scalapb" %% "scalapb-runtime" % "0.9.1",
   /*
    We used to include this but now it's part of EMR + Databricks so now it's in provided.
    https://docs.databricks.com/release-notes/runtime/5.3.html#installed-java-and-scala-libraries-scala-2-11-cluster-version
@@ -98,7 +98,8 @@ assemblyShadeRules in assembly := Seq(
   // We are building our code against open source delta but shading allows us to run against commercial delta
   ShadeRule.rename("org.apache.spark.sql.delta.**" -> "com.databricks.sql.transaction.tahoe.@1").inAll,
   // This clashes with built in libraries in spark. So we shade it.
-  ShadeRule.rename("org.apache.http.**" -> "shadedhttp.@1").inAll
+  ShadeRule.rename("org.apache.http.**" -> "shadedhttp.@1").inAll,
+  ShadeRule.rename("com.google.protobuf.**" -> "shadeproto.@1").inAll
 )
 
 assemblyMergeStrategy in assembly := {
