@@ -4,7 +4,6 @@ name := "dataplatform_utils"
 organization := "com.goibibo"
 version := "2.4"
 scalaVersion := "2.11.12"
-ensimeScalaVersion in ThisBuild := "2.11.12"
 addCompilerPlugin(scalafixSemanticdb) // enable SemanticDB
 javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
 scalacOptions ++= List(
