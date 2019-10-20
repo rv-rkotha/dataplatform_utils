@@ -22,6 +22,8 @@ import org.apache.spark.sql.DataFrame
 
 import org.apache.spark.sql.types.{StructType, DataType}
 import org.apache.spark.sql.catalyst.analysis
+// import org.apache.spark.sql.internal.SQLConf.StoreAssignmentPolicy
+// import org.apache.spark.sql.internal.SQLConf.StoreAssignmentPolicy.STRICT
 
 import java.net.URI
 
@@ -214,10 +216,10 @@ object DeltaUtils {
 
     val alterSchema =
       if (mergeSchema && !oldSchema.isEmpty) {
-        if (!DataType.canWrite(write = schema, read = oldSchema.get,
-                               resolver = analysis.caseInsensitiveResolution,
-                               context = "record",
-                               addError = (s) => logger.error(s))) true else false
+        if (!DataType.canWrite(write = schema, read = oldSchema.get,// byName = true,
+                               resolver = analysis.caseInsensitiveResolution,// storeAssignmentPolicy = StoreAssignmentPolicy.STRICT
+                               context = "record"//, addError = (s) => logger.error(s)
+                               )) true else false
       } else false
 
     if (alterSchema) {
