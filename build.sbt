@@ -2,7 +2,7 @@ import scala.sys.process._
 
 name := "dataplatform_utils"
 organization := "com.goibibo"
-version := "2.4.4.1"
+version := "2.4.3"
 scalaVersion := "2.11.12"
 addCompilerPlugin(scalafixSemanticdb) // enable SemanticDB
 javacOptions ++= Seq("-source", "1.8", "-target", "1.8")
@@ -20,6 +20,7 @@ libraryDependencies ++= Seq(
    and if we don't include it then almost all our users will have to include it.
    */
   "com.jsuereth" %% "scala-arm" % "2.0",
+
   "com.thesamet.scalapb" %% "scalapb-runtime" % "0.9.1",
   /*
    We used to include this but now it's part of EMR + Databricks so now it's in provided.
@@ -79,7 +80,11 @@ libraryDependencies ++= Seq(
    kShift imports this library and adds kafka + spark-streaming-kafka-0-10 + zookeeper
    as dependency.
    */
-  "com.amazon.redshift" % "redshift-jdbc4" % "1.2.20.1043" % "provided",
+
+  "com.amazon.redshift" % "redshift-jdbc4" % "1.2.20.1043" % "provided" excludeAll(
+    ExclusionRule(organization = "com.amazonaws.auth")
+  ),
+
   "com.fasterxml.jackson.core" % "jackson-core" % "2.6.7" % "provided",
 
   "software.amazon.awssdk" % "glue" % "2.5.66",
@@ -92,6 +97,14 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.7" % "test",
   /* Pureconfig is only used in test. */
   "com.github.pureconfig" %% "pureconfig" % "0.10.2" % "test",
+  "com.holdenkarau" %% "spark-testing-base" % "2.3.1_0.12.0" % "test",
+  )
+
+parallelExecution in Test := false
+
+dependencyOverrides ++= Seq(
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.6.7",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.6.7",
 )
 
 assemblyShadeRules in assembly := Seq(
