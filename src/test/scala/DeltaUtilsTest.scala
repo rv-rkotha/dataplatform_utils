@@ -3,10 +3,6 @@ import org.scalatest._
 import com.holdenkarau.spark.testing.SharedSparkContext
 import org.apache.hadoop.fs.Path
 import org.apache.spark.sql.SparkSession
-import java.sql.Date
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types._
 import DeltaUtils._
 
 class DeltaUtilsTest extends FlatSpec with Matchers with PrivateMethodTester with SharedSparkContext {
