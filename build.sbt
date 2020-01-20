@@ -21,6 +21,7 @@ libraryDependencies ++= Seq(
    */
   "com.jsuereth" %% "scala-arm" % "2.0",
 
+  "com.thesamet.scalapb" %% "scalapb-runtime" % "0.9.1",
   /*
    We used to include this but now it's part of EMR + Databricks so now it's in provided.
    https://docs.databricks.com/release-notes/runtime/5.3.html#installed-java-and-scala-libraries-scala-2-11-cluster-version
@@ -79,9 +80,11 @@ libraryDependencies ++= Seq(
    kShift imports this library and adds kafka + spark-streaming-kafka-0-10 + zookeeper
    as dependency.
    */
+
   "com.amazon.redshift" % "redshift-jdbc4" % "1.2.20.1043" % "provided" excludeAll(
     ExclusionRule(organization = "com.amazonaws.auth")
   ),
+
   "com.fasterxml.jackson.core" % "jackson-core" % "2.6.7" % "provided",
 
   "software.amazon.awssdk" % "glue" % "2.5.66",
@@ -108,7 +111,8 @@ assemblyShadeRules in assembly := Seq(
   // We are building our code against open source delta but shading allows us to run against commercial delta
   ShadeRule.rename("org.apache.spark.sql.delta.**" -> "com.databricks.sql.transaction.tahoe.@1").inAll,
   // This clashes with built in libraries in spark. So we shade it.
-  ShadeRule.rename("org.apache.http.**" -> "shadedhttp.@1").inAll
+  ShadeRule.rename("org.apache.http.**" -> "shadedhttp.@1").inAll,
+  ShadeRule.rename("com.google.protobuf.**" -> "shadeproto.@1").inAll
 )
 
 assemblyMergeStrategy in assembly := {

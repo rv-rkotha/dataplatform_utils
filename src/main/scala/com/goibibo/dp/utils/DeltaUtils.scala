@@ -22,14 +22,12 @@ import org.apache.spark.sql.DataFrame
 
 import org.apache.spark.sql.types.{StructType, DataType}
 import org.apache.spark.sql.catalyst.analysis
-// import org.apache.spark.sql.internal.SQLConf.StoreAssignmentPolicy
-// import org.apache.spark.sql.internal.SQLConf.StoreAssignmentPolicy.STRICT
+
 
 import java.net.URI
 
 import org.apache.hadoop.fs.FileSystem
 import org.apache.hadoop.conf.Configuration
-
 
 import org.json4s._
 import org.json4s.jackson.Serialization
@@ -90,7 +88,6 @@ object DeltaUtils {
           .option("mergeSchema", mergeSchema.toString)
           .save(path)
     }
-
     deltaToGlue(spark, DPath(path), tb, mergeSchema, partitions).get
   } recoverWith {
     case t: Throwable => t.printStackTrace; Failure(t)
