@@ -387,19 +387,25 @@ object DeltaUtils {
                   files: Seq[(String, Long)]
                   ) => {
                 val subManifestJson = getManifestContent(files, path)
+
                 val (partitionLocation, subManifestLocation) = writeManifest(
                   partitionValue,
                   subManifestJson,
                   path,
                   deltaVersionRange._2
                 )
+
                 (partitionValue, partitionLocation, subManifestLocation)
               }
-            }
+            } // Filter null value partitions
           )
+          .collect
+          .filter {
+            case (pv, _pl, _sm) => !pv.valuesIterator.exists(_.contains("null"))
+          }
       val serde =
         org.apache.spark.sql.internal.HiveSerDe.serdeMap.get("parquet").get
-      val catalogPartitions = partitionData.collect.map {
+      val catalogPartitions = partitionData.map {
         case (partitionValue, partitionLocation, subManifestLocation) =>
           val catalogPartition = CatalogTablePartition(
             partitionValue,
@@ -461,15 +467,17 @@ object DeltaUtils {
         logger.debug(k); logger.debug(v);
         s"${k}=${v}/"
     }.mkString
+
     val partitionLocation = path + partitionPath
     val MANIFEST_DIR = "_manifests/"
     val manifestLocation = partitionLocation + MANIFEST_DIR + deltaVersion
     val hadoopPath = new Path(manifestLocation)
     val fs = FileSystem.get(hadoopPath.toUri, new Configuration())
-    val fileStream = fs.create(hadoopPath, true)
-    fileStream.write(manifestJson.getBytes)
-
-    fileStream.close
+    if (!partitionValue.valuesIterator.exists(_.contains("null"))) {
+      val fileStream = fs.create(hadoopPath, true)
+      fileStream.write(manifestJson.getBytes)
+      fileStream.close
+    }
     (partitionLocation, manifestLocation)
   }
 
