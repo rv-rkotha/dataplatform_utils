@@ -401,7 +401,11 @@ object DeltaUtils {
           )
           .collect
           .filter {
-            case (pv, _pl, _sm) => !pv.valuesIterator.exists(_.contains("null"))
+            case (pv, _pl, _sm) =>
+              pv != null && !pv
+                .map { case (k, v) => (k, Option(v)) }
+                .valuesIterator
+                .exists(_.isEmpty)
           }
       val serde =
         org.apache.spark.sql.internal.HiveSerDe.serdeMap.get("parquet").get
@@ -473,7 +477,12 @@ object DeltaUtils {
     val manifestLocation = partitionLocation + MANIFEST_DIR + deltaVersion
     val hadoopPath = new Path(manifestLocation)
     val fs = FileSystem.get(hadoopPath.toUri, new Configuration())
-    if (!partitionValue.valuesIterator.exists(_.contains("null"))) {
+    if (partitionValue != null && !partitionValue
+          .map { case (k, v) => (k, Option(v)) }
+          .valuesIterator
+          .exists(
+            _.isEmpty
+          )) {
       val fileStream = fs.create(hadoopPath, true)
       fileStream.write(manifestJson.getBytes)
       fileStream.close
