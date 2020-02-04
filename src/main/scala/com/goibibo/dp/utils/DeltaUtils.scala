@@ -244,13 +244,7 @@ object DeltaUtils {
           toHivePartition(spark, cp, catalogTable, dbName, tableName, Some(l)).get
       }
 
-      val alterSchema =
-        if (mergeSchema && !oldSchema.isEmpty) {
-          Try {
-            org.apache.spark.sql.delta.schema.SchemaUtils
-              .mergeSchemas(tableSchema = oldSchema.get, dataSchema = schema)
-          }.isFailure
-        } else false
+      val alterSchema = true
 
       if (alterSchema) {
         val hiveSchemaFields =
