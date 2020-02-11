@@ -150,7 +150,8 @@ object DeltaUtils {
       spectrumTable: STable,
       mergeSchema: Boolean = true,
       partitionColumns: Option[Seq[String]] = None,
-      tableProperties: Map[String, String] = Map.empty[String, String]
+      tableProperties: Map[String, String] = Map.empty[String, String],
+      columnsToIgnore: Seq[String] = Seq()
   )(implicit glueClient: GlueClient): Try[Unit] =
     Try {
       import spark.implicits._
@@ -243,6 +244,8 @@ object DeltaUtils {
         case (cp, l) =>
           toHivePartition(spark, cp, catalogTable, dbName, tableName, Some(l)).get
       }
+
+      schema.filter(sf => !(columnsToIgnore.contains(sf.name)))
 
       val alterSchema =
         if (mergeSchema && !oldSchema.isEmpty) {
